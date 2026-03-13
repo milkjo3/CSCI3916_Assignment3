@@ -72,24 +72,32 @@ router.route('/movies')
     // Return list of all movies.
     .get(authJwtController.isAuthenticated, async (req, res) => {
       try {
+        // Find all movies
         const movies = await Movie.find();
+
+        // Return a 204 if no movies are found
         if (movies.length === 0){
-          return res.status(204).json({success: true, message: 'Successful request, no movies to be fetched.'});
+          return res.status(204).json();
         }
-        return res.status(200).json({success: true, message: 'Successfully fetched all movies.', movie_list : movies});
+        return res.status(200).json(movies);
       }
+
       catch (err){
         console.log(err);
         return res.status(500).json({ success: false, message: 'Internal server error.' });
       }
     })
 
-    // 
+
+    // Add a movie to the database.
     .post(authJwtController.isAuthenticated, async (req, res) => {
       try {
+        // Check if missing required fields
         if (!req.body.title) {
           return res.status(400).json({ success: false, msg: 'Cannot POST movie, missing required field: title' }); // 400 Bad Request
         }
+
+        // Check if the genre is valid and then create a movie
         const genres = Movie.schema.path("genre").enumValues;
         const movie = new Movie({
           title: req.body.title,
@@ -98,20 +106,25 @@ router.route('/movies')
           actors: req.body.actors ? req.body.actors : undefined
         });
 
+        // Save the movie to the database
         await movie.save();
-
-        res.status(201).json({ success: true, msg: 'Successfully created new movie.' });
+        res.status(201).json({ success: true, msg: 'Successfully created new movie.', movie : movie});
       }
+
       catch (err){
         console.log(err);
         return res.status(500).json({ success: false, message: 'Internal server error' });
       }
     })
+
+    // Route not supported
     .put(async (req, res) => {
-        return res.status(500).json({sucess: false, message: 'PUT request not supported.'});
+        return res.status(500).json({success: false, message: 'PUT request not supported.'});
     })
+
+    // Route not supported
     .delete(async (req, res) => {
-        return res.status(500).json({sucess: false, message: 'DELETE request not supported.'});
+        return res.status(500).json({success: false, message: 'DELETE request not supported.'});
     });
 
 
@@ -119,47 +132,76 @@ router.route('/movies/:title')
     // Return movie based on title.
     .get(authJwtController.isAuthenticated, async (req, res) => {
       try {
+
+        // Find one movie based on titled
         const movie = await Movie.findOne({title: req.params.title});
+
+        // Return 204 if none found
         if (!movie){
           return res.status(204).json();
         }
+
+        // Return the movie
         return res.status(200).json({success: true, message: 'Successfully fetched movie.', movie : movie});
       }
-      
+
       catch (err){
         console.log(err);
         return res.status(500).json({ success: false, message: 'Internal server error.' });
       }
     })
 
-    
+
+    // Route not supported.    
     .post(authJwtController.isAuthenticated, async (req, res) => {
-      return res.status(500).json({sucess: false, message: 'POST request not supported.'});
+      return res.status(500).json({success: false, message: 'POST request not supported.'});
     })
 
-
+    
+    // Update a movie based on the title.
     .put(authJwtController.isAuthenticated, async (req, res) => {
       try {
-        
+
+        // Find movie using title
+        const movie = await Movie.findOne({title : req.params.title});
+
+        // If no movie, return 404
+        if (!movie){
+          return res.status(404).json({success : false, message : 'PUT failed, resource cannot be found.', resource: `${req.params.title}`});
+        }
+
+        // Update the movie
+        const resource = await Movie.updateOne({title : req.params.title}, {$set : req.body});
+        if (resource.modifiedCount === 1){
+          return res.status(200).json({success : true, message : 'Resource updated successfully.', resource: `${req.params.title}`});
+        }
+        else {
+          return res.status(500).json({success : false, message : 'Resource could not be updated.', resource: `${req.params.title}`});
+        }
       }
 
       catch (err) {
         console.log(err);
-        return res.status(500).json({sucess: false, message: 'Internal server error.'});
+        return res.status(500).json({success: false, message: 'Internal server error.'});
       }
     })
 
-
+    // Delete a movie based on its title.
     .delete(authJwtController.isAuthenticated, async (req, res) => {
       try {
+
+        // Find the movie by title 
         const movie = await Movie.findOne({title: req.params.title});
+
+        // Return 404 if not found
         if (!movie){
           return res.status(404).json({success : false, message : 'DELETE failed, resource cannot be found.', resource: `${req.params.title}`});
         }
 
+        // Delete the movie
         const resource = await Movie.deleteOne({title : req.params.title});
         if (resource.deletedCount === 1){
-          return res.status(200).json({success : true, message: 'Resource deleted successfully.'});
+          return res.status(200).json({success : true, message: 'Resource deleted successfully.', resource: `${req.params.title}`});
         }
         else {
           return res.status(500).json({success : false, message: 'Resource could not be deleted.', resource: `${req.params.title}`});
